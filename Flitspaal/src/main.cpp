@@ -3,8 +3,7 @@
  *                                                                 *
     Written by Nick de Ronde
  *******************************************************************/
-
-#include "arduino.h"
+#include "main.h"
 
 #include <PxMatrix.h>
 #ifdef ESP32
@@ -42,19 +41,20 @@ Ticker display_ticker;
 
 
 // pin number for FOUT
-#define SPEED_PIN 8
+#define SPEED_PIN 4
 // number of samples for averaging
-#define AVERAGE 2
+#define AVERAGE 7
 
+// these variables need to be assigned volatile, since they can be updated from both processorcores independenlty.
 volatile unsigned int doppler_div = 44;
 volatile unsigned int samples[AVERAGE];
 volatile unsigned int x;
-volatile unsigned int speed = 0;
+volatile unsigned int speed = 0; 
 volatile unsigned int Freq = 0;
 volatile unsigned int Ttime = 0;
 volatile unsigned int lastSpeed = 0;
 
-uint8_t display_draw_time = 20; // Sets the display brightness, should be approx between 10 and 50 or something. Too high and ESP will crash. 
+uint8_t display_draw_time = 20; // Sets the display brightness, should be approx between 10 and 50 or something.
 
 PxMATRIX display(32, 16, P_LAT, P_OE, P_A, P_B);
 
@@ -146,87 +146,6 @@ void draw_weather_icon (uint8_t icon)
   }
 }
 
-void speed_calculator()
-{
-  noInterrupts();
-  display_update_enable(false);
-  pulseIn(SPEED_PIN, HIGH);
-  unsigned int pulse_length = 0;
-
-  for (x = 0; x < AVERAGE; x++)
-  {
-    pulse_length = pulseIn(SPEED_PIN, HIGH, 700000L);
-    pulse_length += pulseIn(SPEED_PIN, LOW, 700000L);
-
-    samples[x] = pulse_length;
-  }
-
-  // yield();
-  interrupts();
-
-  // Check for consistency
-  bool samples_ok = true;
-  unsigned int nbPulsesTime = samples[0];
-  for (x = 1; x < AVERAGE; x++)
-  {
-    nbPulsesTime += samples[x];
-    if ((samples[x] > samples[0] * 2) || (samples[x] < samples[0] / 2))
-    {
-      samples_ok = false;
-    }
-  }
-
-  display_update_enable(true);
-
-  if (samples_ok)
-  {
-    Ttime = nbPulsesTime / AVERAGE;
-    Freq = 1000000 / Ttime;
-    speed = Freq / doppler_div;
-
-    if (speed <= 5)
-    {
-      display.clearDisplay();
-      display.setTextColor(myYELLOW);
-      display.setCursor(0, 0);
-      display.print("Too");
-      display.setTextColor(myRED);
-      display.setCursor(0, 8);
-      display.print("Slow!");
-    }
-  }
-  else if (speed == lastSpeed)
-  {
-    display.setTextColor(myGREEN);
-    display.setCursor(0, 0);
-    display.print((String)speed);
-    display.setTextColor(myMAGENTA);
-    display.setCursor(0, 8);
-    display.print("Km/h");
-  }
-
-  else
-  {
-    // Serial.print(Ttime);
-    Serial.print(Freq);
-    Serial.print("Hz : ");
-    Serial.print(speed);
-    Serial.print("km/h\r\n");
-
-    display.clearDisplay();
-    display.setTextColor(myGREEN);
-    display.setCursor(0, 0);
-    display.print((String)speed);
-    display.setTextColor(myMAGENTA);
-    display.setCursor(0, 8);
-    display.print("Km/h");
-
-    yield();
-    // delay(500);
-  }
-  lastSpeed = speed;
-  display.display(1000);
-}
 
 void setup()
 {
@@ -235,7 +154,6 @@ void setup()
 
   //Init the pin for the CDM324 Radar sensor
   pinMode(SPEED_PIN, INPUT);
-
   // Define your display layout here, e.g. 1/2 step
   display.begin(2);
 
@@ -261,12 +179,70 @@ void setup()
   yield();
 
   display.clearDisplay();
-  xTaskCreatePinnedToCore(loop1, "sensorLoop", 4096, NULL, 1, NULL, ARDUINO_RUNNING_CORE); // TODO, create task that handles the mainloop here. 
-  // delay(500);
+  xTaskCreatePinnedToCore(speedLoop, "sensorLoop", 4096, NULL, 1, NULL, BACKGROUND_RUNNING_CORE); // TODO, create task that handles the mainloop here. 
+
 }
 
+void speedLoop(void *pvParameters)
+{
+  const long setupTimeout {300000L};
+  while (true)
+  {
+    // noInterrupts();
+    // unsigned long start_timer = micros();
+    // Wait for rising pulse. If it does not arrive, then try again
+    if (pulseIn(SPEED_PIN, HIGH, setupTimeout)==setupTimeout){ 
+      vTaskDelay(1); // Allow the processor to do other stuff before continuing, preventing WDT timeout
+      continue; 
+    }
+    unsigned int pulse_length = 0;
+    for (x = 0; x < AVERAGE; x++)
+    {
+      pulse_length = pulseIn(SPEED_PIN, HIGH, 300000L); // timeout of 5ms
+      pulse_length += pulseIn(SPEED_PIN, LOW, 300000L);
+      samples[x] = pulse_length;
+    }
+    // unsigned long delta_timer = micros() - start_timer;
+    // Serial.print("input time in micros ");
+    // Serial.println(delta_timer);
+    vTaskDelay(1);
+    // yield();
+    // interrupts();
+
+    // Check for consistency
+    bool samples_ok = true;
+    unsigned int nbPulsesTime = samples[0];
+    for (x = 1; x < AVERAGE; x++)
+    {
+      nbPulsesTime += samples[x];
+      if ((samples[x] > samples[0] * 2) || (samples[x] < samples[0] / 2))
+      {
+      samples_ok = false;
+      }
+    }
+    if (samples_ok)
+    {
+      unsigned int Ttime = nbPulsesTime / AVERAGE;
+      if (Ttime == 0)
+        continue; // Don't run the stuff below, because that would be dividing by 0!
+      unsigned int Freq = 1000000L / Ttime;
+      Serial.print(Ttime);
+      Serial.print("\r\n");
+      Serial.print(Freq);
+      Serial.print("Hz : ");
+      Serial.print(Freq / doppler_div);
+      speed = Freq / doppler_div;
+      Serial.print("km/h\r\n");
+    }
+    // speed++;
+    vTaskDelay(1); // One tick delay to allow other processes that might be running on this core to do their thing
+    // vTaskDelayUntil( &xLastWakeTime, xDelay );
+  }
+}
 
 uint8_t icon_index=0;
+// This loop runs independently of the speedloop. 
+// Any delays you put in here won't cause any issues with the speedloop, since they run on a different processor core
 void loop()
 {
   // speed_calculator();
@@ -279,7 +255,7 @@ display.clearDisplay();
     display.setTextColor(myWHITE);
     display.setCursor(0, 8);
     display.print("Fatty!");
-    delay(1000);
+    delay(100);
   }
 
   else
@@ -290,18 +266,6 @@ display.clearDisplay();
     display.setTextColor(myMAGENTA);
     display.setCursor(0, 8);
     display.print("Km/h");
-    delay(1000);
+    delay(100);
   }
-  display.clearDisplay();
-  draw_weather_icon(icon_index);
-  icon_index++;
-  if (icon_index>10)
-    icon_index=0;
-  delay(1000);
-  // display_update_enable(true);
-
-  // yield();
-  // delay(500);
-
-  // display_update_enable(false);
 }
