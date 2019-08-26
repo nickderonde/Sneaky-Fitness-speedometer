@@ -180,6 +180,7 @@ void setup()
 
   display.clearDisplay();
   xTaskCreatePinnedToCore(speedLoop, "sensorLoop", 4096, NULL, 1, NULL, BACKGROUND_RUNNING_CORE); // TODO, create task that handles the mainloop here. 
+  pinMode(LED_BUILTIN, OUTPUT);
 
 }
 
@@ -247,17 +248,16 @@ void loop()
 {
   // speed_calculator();
 display.clearDisplay();
-  if (speed < 4)
+  if (speed < 4 || speed > 28)
   {
     display.setTextColor(myCYAN);
     display.setCursor(0, 0);
-    display.print("REN !");
+    display.print("START");
     display.setTextColor(myWHITE);
     display.setCursor(0, 8);
-    display.print("Fatty!");
+    display.print("RUN !");
     delay(100);
   }
-
   else
   {
     display.setTextColor(myCYAN);
