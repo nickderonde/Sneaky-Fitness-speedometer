@@ -1,5 +1,5 @@
-# Sneaky-Fitness
-Interventions sneaky fitness - project Build in platformIO
+# Sneaky-Fitness-speedometer
+Project is build in platformIO
 
 ## Hardware
 - [radar sensor CDM324](https://www.tindie.com/products/stephanelec/cdm324-doppler-speed-sensor-arduino-compatible/) | 
