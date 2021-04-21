@@ -262,10 +262,11 @@ display.clearDisplay();
   {
     display.setTextColor(myCYAN);
     display.setCursor(0, 0);
-    display.print((String)speed);
+      //convert speed to Miles/H
+    display.print((String)speed * 0.6213711922);
     display.setTextColor(myMAGENTA);
     display.setCursor(0, 8);
-    display.print("Km/h");
+    display.print("mph");
     delay(100);
   }
 }
