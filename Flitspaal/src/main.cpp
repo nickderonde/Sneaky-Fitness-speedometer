@@ -50,6 +50,7 @@ volatile unsigned int doppler_div = 44;
 volatile unsigned int samples[AVERAGE];
 volatile unsigned int x;
 volatile unsigned int speed = 0; 
+volatile unsigned int speedMph = 0; 
 volatile unsigned int Freq = 0;
 volatile unsigned int Ttime = 0;
 volatile unsigned int lastSpeed = 0;
@@ -232,8 +233,12 @@ void speedLoop(void *pvParameters)
       Serial.print(Freq);
       Serial.print("Hz : ");
       Serial.print(Freq / doppler_div);
+      // speed in km/h
       speed = Freq / doppler_div;
-      Serial.print("km/h\r\n");
+      //speed in mph  
+      speedMph = speed * 0.6213711922;  
+      // Serial.print("km/h\r\n");
+      Serial.print("mph\r\n");
     }
     // speed++;
     vTaskDelay(1); // One tick delay to allow other processes that might be running on this core to do their thing
@@ -248,7 +253,8 @@ void loop()
 {
   // speed_calculator();
 display.clearDisplay();
-  if (speed < 4 || speed > 28)
+  // if (speed < 4 || speed > 28)
+  if (speedMph < 2 || speedMph > 18)
   {
     display.setTextColor(myCYAN);
     display.setCursor(0, 0);
@@ -262,10 +268,13 @@ display.clearDisplay();
   {
     display.setTextColor(myCYAN);
     display.setCursor(0, 0);
-      //convert speed to Miles/H
-    display.print((String)speed * 0.6213711922);
+    //convert speed to KM/H
+    // display.print((String)speed);
+    //convert speed to Miles/H
+    display.print((String)speedMph);
     display.setTextColor(myMAGENTA);
     display.setCursor(0, 8);
+    //display.print("km/h");
     display.print("mph");
     delay(100);
   }
