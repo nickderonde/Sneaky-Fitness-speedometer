@@ -227,17 +227,19 @@ void speedLoop(void *pvParameters)
       if (Ttime == 0)
         continue; // Don't run the stuff below, because that would be dividing by 0!
       unsigned int Freq = 1000000L / Ttime;
-      Serial.print(Ttime);
-      Serial.print("\r\n");
-      Serial.print(Freq);
-      Serial.print("Hz : ");
+
+      //serial print lines uncomment when serial needed 
+      // Serial.print(Ttime);
+      // Serial.print("\r\n");
+      // Serial.print(Freq);
+      // Serial.print("Hz : ");
       // Serial.print(Freq / doppler_div);
-      Serial.print((Freq / doppler_div)*0.62137119223733);
+      // Serial.print((Freq / doppler_div)*0.62137119223733);
       kmh = Freq / doppler_div; 
-      speed = kmh * 0.62137119223733;
-      // speed = Freq / doppler_div;
+      speed = kmh * 0.62137119223733; // speed in MPH 
+      // speed = Freq / doppler_div; // use this one for KM/h
       // Serial.print("km/h\r\n");
-      Serial.print("mph\r\n");
+      // Serial.print("mph\r\n");
 
       if (speed > 2 && speed < 22  )
       // if (speed > 2 && speed < 30  )//km/h
